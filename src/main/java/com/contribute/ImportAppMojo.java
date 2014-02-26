@@ -58,6 +58,12 @@ public class ImportAppMojo extends AbstractMojo {
      */
     private String password;
     /**
+     * The command to start the SQL*Plus executable.
+     *
+     * @parameter expression="${import.sqlplusCmd}" default-value="sqlplus"
+     */
+    private String sqlplusCmd;
+    /**
      * The ORACLE_HOME system environment variable.
      *
      * @parameter expression="${import.oracleHome}"
@@ -72,7 +78,7 @@ public class ImportAppMojo extends AbstractMojo {
     private String tnsAdmin;
     /**
      * Environment variable to specify the path used to search for libraries on
-     * UNIX and Linux.
+     * UNIX and Linux systems.
      *
      * @parameter expression="${import.libraryPath}"
      */
@@ -105,19 +111,29 @@ public class ImportAppMojo extends AbstractMojo {
             File scriptsToRunTmpFile = createScriptsToRunTmpFile();
             String buffer;
 
-            // TODO: more debug info
-            getLog().debug("Executing: " + "sqlplus " + getSqlPlusLoginArgument() + " @" + scriptsToRunTmpFile.getAbsolutePath());
+            getLog().debug("Executing SQL*Plus: " + sqlplusCmd + " -L " + getSqlPlusLoginArgument() + " @" + scriptsToRunTmpFile.getAbsolutePath());
 
-            ProcessBuilder processBuilder = new ProcessBuilder("sqlplus", getSqlPlusLoginArgument(), "@" + scriptsToRunTmpFile.getAbsolutePath());
+            ProcessBuilder processBuilder = new ProcessBuilder(sqlplusCmd, "-L", getSqlPlusLoginArgument(), "@" + scriptsToRunTmpFile.getAbsolutePath());
             Map environmentVariables = processBuilder.environment();
 
             // http://docs.oracle.com/cd/B28359_01/server.111/b31189/ch2.htm
-            environmentVariables.put("ORACLE_HOME", oracleHome);
-            environmentVariables.put("TNS_ADMIN", tnsAdmin);
-            environmentVariables.put("LD_LIBRARY_PATH", libraryPath);
-            environmentVariables.put("DYLD_LIBRARY_PATH", libraryPath);
-            environmentVariables.put("LIBPATH", libraryPath);
-            environmentVariables.put("SHLIB_PATH", libraryPath);
+            if (oracleHome != null) {
+                environmentVariables.put("ORACLE_HOME", oracleHome);
+            }
+            if (tnsAdmin != null) {
+                environmentVariables.put("TNS_ADMIN", tnsAdmin);
+            }
+            if (libraryPath != null) {
+                environmentVariables.put("LD_LIBRARY_PATH", libraryPath);
+                environmentVariables.put("DYLD_LIBRARY_PATH", libraryPath);
+                environmentVariables.put("LIBPATH", libraryPath);
+                environmentVariables.put("SHLIB_PATH", libraryPath);
+            }
+
+            getLog().debug("Printing all environment variables:");
+            for (Object key : environmentVariables.keySet()) {
+                getLog().debug("  " + key.toString() + "=" + environmentVariables.get(key));
+            }
 
             processBuilder.redirectErrorStream(true);
             Process process = processBuilder.start();
@@ -133,8 +149,13 @@ public class ImportAppMojo extends AbstractMojo {
                 System.out.println(buffer);
             }
             stdError.close();
+
+            getLog().debug("Process exit value: " + process.exitValue());
+            if (process.exitValue() == 1) {
+                throw new MojoExecutionException("SQL*Plus process exited with code 1");
+            }
         } catch (IOException ex) {
-            throw new MojoExecutionException("Error generating execution file", ex);
+            throw new MojoExecutionException("An error occurred while executing SQL*Plus", ex);
         }
     }
 
