@@ -1,20 +1,5 @@
 package com.contribute;
 
-/*
- * Copyright 2001-2005 The Apache Software Foundation.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -37,14 +22,15 @@ import org.apache.maven.plugin.MojoFailureException;
 public class ImportAppMojo extends AbstractMojo {
 
     /**
-     * The database connection string used in the SQL*Plus login argument.
+     * The database connection string used in the SQL*Plus login argument (e.g.
+     * localhost:1521/orcl.company.com).
      *
      * @parameter expression="${import.connectionString}"
      * @required
      */
     private String connectionString;
     /**
-     * The database username.
+     * The database username used to login in SQL*Plus.
      *
      * @parameter expression="${import.username}"
      * @required
@@ -58,7 +44,8 @@ public class ImportAppMojo extends AbstractMojo {
      */
     private String password;
     /**
-     * The command to start the SQL*Plus executable.
+     * The command to start the SQL*Plus executable. The default value is
+     * 'sqlplus'.
      *
      * @parameter expression="${import.sqlplusCmd}" default-value="sqlplus"
      */
@@ -84,26 +71,64 @@ public class ImportAppMojo extends AbstractMojo {
      */
     private String libraryPath;
     /**
-     * The relative path to the folder containing the application export files.
+     * The relative path to the folder containing the application export
+     * file(s).
      *
      * @parameter expression="${import.appExportLocation}"
      * @required
      */
     private String appExportLocation;
     /**
-     * The target APEX workspace.
+     * The APEX workspace in which you want to import the application. Omit this
+     * parameter to import the application in the original workspace.
      *
      * @parameter expression="${import.workspaceName}"
      * @required
      */
     private String workspaceName;
     /**
-     * The target APEX application ID.
+     * The target APEX application ID. Omit this parameter to import the
+     * application with the original application ID.
      *
      * @parameter expression="${import.appId}"
-     * @required
      */
     private String appId;
+    /**
+     * Set the application alias.
+     *
+     * @parameter expression="${import.appAlias}"
+     */
+    private String appAlias;
+    /**
+     * Set the application name.
+     *
+     * @parameter expression="${import.appName}"
+     */
+    private String appName;
+    /**
+     * Set the application parsing schema.
+     *
+     * @parameter expression="${import.appParsingSchema}"
+     */
+    private String appParsingSchema;
+    /**
+     * Set the image prefix of the application.
+     *
+     * @parameter expression="${import.appImagePrefix}"
+     */
+    private String appImagePrefix;
+    /**
+     * Set the proxy server attributes of the application to be imported.
+     *
+     * @parameter expression="${import.appProxy}"
+     */
+    private String appProxy;
+    /**
+     * The offset value for the application import.
+     *
+     * @parameter expression="${import.appOffset}"
+     */
+    private String appOffset;
     private final String sqlFileExtension = ".sql";
 
     public void execute() throws MojoExecutionException, MojoFailureException {
@@ -152,7 +177,7 @@ public class ImportAppMojo extends AbstractMojo {
 
             getLog().debug("Process exit value: " + process.exitValue());
             if (process.exitValue() == 1) {
-                throw new MojoExecutionException("SQL*Plus process exited with code 1");
+                throw new MojoExecutionException("SQL*Plus process returned exit value 1");
             }
         } catch (IOException ex) {
             throw new MojoExecutionException("An error occurred while executing SQL*Plus", ex);
@@ -173,20 +198,52 @@ public class ImportAppMojo extends AbstractMojo {
         BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(setApexEnvTmpFile));
 
         // http://docs.oracle.com/cd/E37097_01/doc/doc.42/e35127/apex_app_inst.htm#AEAPI530
-        // TODO: support more import parameters
         script = "declare\n"
                 + "  l_workspace_id apex_workspaces.workspace_id%type;\n"
-                + "begin\n"
-                + "  select workspace_id\n"
-                + "  into l_workspace_id\n"
-                + "  from apex_workspaces\n"
-                + "  where upper(workspace) = upper('" + workspaceName + "');\n"
-                + "\n"
-                + "  apex_application_install.set_workspace_id(l_workspace_id);\n"
-                + "  apex_application_install.set_application_id(" + appId + ");\n"
-                + "  apex_application_install.generate_offset;\n"
+                + "begin\n";
+        if (workspaceName != null) {
+            script = script + ""
+                    + "  select workspace_id\n"
+                    + "  into l_workspace_id\n"
+                    + "  from apex_workspaces\n"
+                    + "  where upper(workspace) = upper('" + workspaceName + "');\n\n"
+                    + "  apex_application_install.set_workspace_id(l_workspace_id);\n";
+        }
+        if (appId != null) {
+            script = script + ""
+                    + "  apex_application_install.set_application_id(" + appId + ");\n";
+        }
+        if (appAlias != null) {
+            script = script + ""
+                    + "  apex_application_install.set_application_alias('" + appAlias + "');\n";
+        }
+        if (appName != null) {
+            script = script + ""
+                    + "  apex_application_install.set_application_name('" + appName + "');\n";
+        }
+        if (appParsingSchema != null) {
+            script = script + ""
+                    + "  apex_application_install.set_schema('" + appParsingSchema + "');\n";
+        }
+        if (appImagePrefix != null) {
+            script = script + ""
+                    + "  apex_application_install.set_image_prefix('" + appImagePrefix + "');\n";
+        }
+        if (appProxy != null) {
+            script = script + ""
+                    + "  apex_application_install.set_proxy('" + appProxy + "');\n";
+        }
+        if (appOffset != null) {
+            script = script + ""
+                    + "  apex_application_install.set_offset(" + appOffset + ");\n";
+        } else {
+            script = script + ""
+                    + "  apex_application_install.generate_offset;\n";
+        }
+        script = script + ""
                 + "end;\n"
                 + "/";
+
         bufferedWriter.write(script);
         bufferedWriter.close();
 
@@ -204,8 +261,8 @@ public class ImportAppMojo extends AbstractMojo {
         BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(scriptsToRunTmpFile));
         bufferedWriter.write("@" + setApexEnvTmpFile.getAbsolutePath());
         bufferedWriter.newLine();
-        for (int i = 0; i < appExportFiles.length; i++) {
-            bufferedWriter.write("@" + appExportFiles[i].getAbsolutePath());
+        for (File appExportFile : appExportFiles) {
+            bufferedWriter.write("@" + appExportFile.getAbsolutePath());
             bufferedWriter.newLine();
         }
         bufferedWriter.write("exit;");
