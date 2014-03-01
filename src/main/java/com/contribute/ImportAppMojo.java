@@ -13,10 +13,9 @@ import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 
 /**
- * Import an APEX application.
+ * Import an APEX application and any related workspace files.
  *
  * @goal import
- *
  * @phase compile
  */
 public class ImportAppMojo extends AbstractMojo {
@@ -51,7 +50,7 @@ public class ImportAppMojo extends AbstractMojo {
      */
     private String sqlplusCmd;
     /**
-     * The ORACLE_HOME system environment variable.
+     * Allows you to set the ORACLE_HOME system environment variable.
      *
      * @parameter expression="${import.oracleHome}"
      */
@@ -83,12 +82,11 @@ public class ImportAppMojo extends AbstractMojo {
      * parameter to import the application in the original workspace.
      *
      * @parameter expression="${import.workspaceName}"
-     * @required
      */
     private String workspaceName;
     /**
-     * The target APEX application ID. Omit this parameter to import the
-     * application with the original application ID.
+     * The ID for the application to be imported. Omit this parameter to import
+     * the application with its original ID.
      *
      * @parameter expression="${import.appId}"
      */
@@ -112,13 +110,13 @@ public class ImportAppMojo extends AbstractMojo {
      */
     private String appParsingSchema;
     /**
-     * Set the image prefix of the application.
+     * Set the application image prefix.
      *
      * @parameter expression="${import.appImagePrefix}"
      */
     private String appImagePrefix;
     /**
-     * Set the proxy server attributes of the application to be imported.
+     * Set the proxy server attributes for the application to be imported.
      *
      * @parameter expression="${import.appProxy}"
      */
@@ -131,159 +129,253 @@ public class ImportAppMojo extends AbstractMojo {
     private String appOffset;
     private final String sqlFileExtension = ".sql";
 
+    /**
+     * The method called by Maven when the 'import' goal gets executed.
+     */
     public void execute() throws MojoExecutionException, MojoFailureException {
+        File scriptsToRunTmpFile;
+        ProcessBuilder processBuilder;
+        Process process;
+        String sqlPlusOutput;
+
         try {
-            File scriptsToRunTmpFile = createScriptsToRunTmpFile();
-            String buffer;
+            scriptsToRunTmpFile = createScriptsToRunTmpFile();
+        } catch (IOException ex) {
+            throw new MojoExecutionException("An unexpected error occurred while generating the .sql scripts", ex);
+        }
 
-            getLog().debug("Executing SQL*Plus: " + sqlplusCmd + " -L " + getSqlPlusLoginArgument() + " @" + scriptsToRunTmpFile.getAbsolutePath());
+        // the -L option specifies not to reprompt for username or password if the initial connection does not succeed.
+        processBuilder = new ProcessBuilder(sqlplusCmd, "-L", getSqlPlusLoginArgument(), "@" + scriptsToRunTmpFile.getAbsolutePath());
+        setEnvironmentVariables(processBuilder.environment());
+        processBuilder.redirectErrorStream(true);
 
-            ProcessBuilder processBuilder = new ProcessBuilder(sqlplusCmd, "-L", getSqlPlusLoginArgument(), "@" + scriptsToRunTmpFile.getAbsolutePath());
-            Map environmentVariables = processBuilder.environment();
-
-            // http://docs.oracle.com/cd/B28359_01/server.111/b31189/ch2.htm
-            if (oracleHome != null) {
-                environmentVariables.put("ORACLE_HOME", oracleHome);
-            }
-            if (tnsAdmin != null) {
-                environmentVariables.put("TNS_ADMIN", tnsAdmin);
-            }
-            if (libraryPath != null) {
-                environmentVariables.put("LD_LIBRARY_PATH", libraryPath);
-                environmentVariables.put("DYLD_LIBRARY_PATH", libraryPath);
-                environmentVariables.put("LIBPATH", libraryPath);
-                environmentVariables.put("SHLIB_PATH", libraryPath);
-            }
-
-            getLog().debug("Printing all environment variables:");
-            for (Object key : environmentVariables.keySet()) {
-                getLog().debug("  " + key.toString() + "=" + environmentVariables.get(key));
-            }
-
-            processBuilder.redirectErrorStream(true);
-            Process process = processBuilder.start();
+        getLog().debug("Executing SQL*Plus: " + sqlplusCmd + " -L " + getSqlPlusLoginArgument() + " @" + scriptsToRunTmpFile.getAbsolutePath());
+        try {
+            process = processBuilder.start();
 
             BufferedReader stdInput = new BufferedReader(new InputStreamReader(process.getInputStream()));
-            while ((buffer = stdInput.readLine()) != null) {
-                System.out.println(buffer);
+            while ((sqlPlusOutput = stdInput.readLine()) != null) {
+                getLog().info(sqlPlusOutput);
             }
             stdInput.close();
 
             BufferedReader stdError = new BufferedReader(new InputStreamReader(process.getErrorStream()));
-            while ((buffer = stdError.readLine()) != null) {
-                System.out.println(buffer);
+            while ((sqlPlusOutput = stdError.readLine()) != null) {
+                getLog().info(sqlPlusOutput);
             }
             stdError.close();
-
-            getLog().debug("Process exit value: " + process.exitValue());
-            if (process.exitValue() == 1) {
-                throw new MojoExecutionException("SQL*Plus process returned exit value 1");
-            }
         } catch (IOException ex) {
-            throw new MojoExecutionException("An error occurred while executing SQL*Plus", ex);
+            throw new MojoExecutionException("An unexpected error occurred while executing SQL*Plus", ex);
+        }
+
+        getLog().debug("SQL*Plus process exit value: " + process.exitValue());
+        if (process.exitValue() != 0) {
+            throw new MojoExecutionException("SQL*Plus process returned an error code (" + process.exitValue() + ")");
         }
     }
 
+    /**
+     * Put together the SQL*Plus login argument based on the plugin parameters.
+     *
+     * @return the SQL*Plus login argument.
+     */
     public String getSqlPlusLoginArgument() {
         return username + "/" + password + "@" + "\"" + connectionString + "\"";
     }
 
-    public File createSetApexEnvTmpFile() throws IOException {
-        File setApexEnvTmpFile;
+    /**
+     * Set Oracle specific environment variables to successfully execute
+     * SQL*Plus. http://docs.oracle.com/cd/B28359_01/server.111/b31189/ch2.htm
+     *
+     * @param environment a copy of the current process environment variables.
+     */
+    public void setEnvironmentVariables(Map environment) {
+        if (oracleHome != null) {
+            environment.put("ORACLE_HOME", oracleHome);
+        }
+        if (tnsAdmin != null) {
+            environment.put("TNS_ADMIN", tnsAdmin);
+        }
+        if (libraryPath != null) {
+            environment.put("LD_LIBRARY_PATH", libraryPath);
+            environment.put("DYLD_LIBRARY_PATH", libraryPath);
+            environment.put("LIBPATH", libraryPath);
+            environment.put("SHLIB_PATH", libraryPath);
+        }
+
+        getLog().debug("Printing all environment variables:");
+        for (Object key : environment.keySet()) {
+            getLog().debug("  " + key.toString() + "=" + environment.get(key));
+        }
+    }
+
+    /**
+     * Create a temporary .sql file containing all the scripts required to
+     * successfully import the APEX application.
+     *
+     * @return the temporary .sql file object.
+     */
+    public File createScriptsToRunTmpFile() throws IOException, MojoExecutionException, MojoFailureException {
+        File scriptsToRunTmpFile;
+        File setAppAttributesTmpFile = createSetAppAttributesTmpFile();
+        File[] exportFiles = getAppExportFiles();
+        BufferedWriter writer;
         String script;
 
-        setApexEnvTmpFile = File.createTempFile("setApexEnv", sqlFileExtension);
-        setApexEnvTmpFile.deleteOnExit();
+        script = "whenever sqlerror exit 1\n";
+        script = script + "set serveroutput on\n";
+        script = script + "@" + setAppAttributesTmpFile.getAbsolutePath() + "\n";
+        script = script + "set serveroutput off\n";
+        for (File exportFile : exportFiles) {
+            script = script + "@" + exportFile.getAbsolutePath() + "\n";
+        }
+        script = script + "exit";
 
-        BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(setApexEnvTmpFile));
+        scriptsToRunTmpFile = File.createTempFile("scriptsToRun", sqlFileExtension);
+        scriptsToRunTmpFile.deleteOnExit();
 
-        // http://docs.oracle.com/cd/E37097_01/doc/doc.42/e35127/apex_app_inst.htm#AEAPI530
+        writer = new BufferedWriter(new FileWriter(scriptsToRunTmpFile));
+        writer.write(script);
+        writer.close();
+
+        getLog().debug("Generated temp file: " + scriptsToRunTmpFile.getName() + ". Printing out content:\n" + script);
+
+        return scriptsToRunTmpFile;
+    }
+
+    /**
+     * Create a temporary .sql file containing an anonymous PL/SQL block that
+     * sets application attributes using the APEX_APPLICATION_INSTALL package.
+     * http://docs.oracle.com/cd/E37097_01/doc/doc.42/e35127/apex_app_inst.htm#AEAPI530
+     *
+     * @return the temporary .sql file object.
+     * @throws IOException signals that an I/O exception of some sort has
+     * occurred.
+     */
+    public File createSetAppAttributesTmpFile() throws IOException {
+        File setAppAttributesTmpFile;
+        BufferedWriter writer;
+        String script;
+
         script = "declare\n"
                 + "  l_workspace_id apex_workspaces.workspace_id%type;\n"
-                + "begin\n";
+                + "begin\n"
+                + "  null;\n\n";
         if (workspaceName != null) {
             script = script + ""
                     + "  select workspace_id\n"
                     + "  into l_workspace_id\n"
                     + "  from apex_workspaces\n"
                     + "  where upper(workspace) = upper('" + workspaceName + "');\n\n"
-                    + "  apex_application_install.set_workspace_id(l_workspace_id);\n";
+                    + ""
+                    + "  apex_application_install.set_workspace_id(l_workspace_id);\n"
+                    + "  dbms_output.put_line('workspace ID set: ' || l_workspace_id || ' (" + workspaceName.toUpperCase() + ")');\n";
         }
         if (appId != null) {
             script = script + ""
-                    + "  apex_application_install.set_application_id(" + appId + ");\n";
+                    + "  apex_application_install.set_application_id(" + appId + ");\n"
+                    + "  dbms_output.put_line('application ID set: " + appId + "');\n";
         }
         if (appAlias != null) {
             script = script + ""
-                    + "  apex_application_install.set_application_alias('" + appAlias + "');\n";
+                    + "  apex_application_install.set_application_alias('" + appAlias + "');\n"
+                    + "  dbms_output.put_line('application alias set: " + appAlias + "');\n";
         }
         if (appName != null) {
             script = script + ""
-                    + "  apex_application_install.set_application_name('" + appName + "');\n";
+                    + "  apex_application_install.set_application_name('" + appName + "');\n"
+                    + "  dbms_output.put_line('application name set: " + appName + "');\n";
         }
         if (appParsingSchema != null) {
             script = script + ""
-                    + "  apex_application_install.set_schema('" + appParsingSchema + "');\n";
+                    + "  apex_application_install.set_schema('" + appParsingSchema + "');\n"
+                    + "  dbms_output.put_line('application parsing schema set: " + appParsingSchema + "');\n";
         }
         if (appImagePrefix != null) {
             script = script + ""
-                    + "  apex_application_install.set_image_prefix('" + appImagePrefix + "');\n";
+                    + "  apex_application_install.set_image_prefix('" + appImagePrefix + "');\n"
+                    + "  dbms_output.put_line('application image prefix set: " + appImagePrefix + "');\n";
         }
         if (appProxy != null) {
             script = script + ""
-                    + "  apex_application_install.set_proxy('" + appProxy + "');\n";
+                    + "  apex_application_install.set_proxy('" + appProxy + "');\n"
+                    + "  dbms_output.put_line('application proxy attributes set: " + appProxy + "');\n";
         }
         if (appOffset != null) {
             script = script + ""
-                    + "  apex_application_install.set_offset(" + appOffset + ");\n";
+                    + "  apex_application_install.set_offset(" + appOffset + ");\n"
+                    + "  dbms_output.put_line('application offset value set: " + appOffset + "');\n";
         } else {
             script = script + ""
                     + "  apex_application_install.generate_offset;\n";
         }
         script = script + ""
+                + "exception\n"
+                + "  when no_data_found then\n"
+                + "    raise_application_error(-20000, 'Workspace ''" + workspaceName.toUpperCase() + "'' not found');\n"
+                + "  when others then\n"
+                + "    raise_application_error(-20000, 'An unexpected error occurred in the setAppAttributes script: ' || sqlerrm);\n"
                 + "end;\n"
                 + "/";
 
-        bufferedWriter.write(script);
-        bufferedWriter.close();
+        setAppAttributesTmpFile = File.createTempFile("setAppAttributes", sqlFileExtension);
+        setAppAttributesTmpFile.deleteOnExit();
 
-        return setApexEnvTmpFile;
+        writer = new BufferedWriter(new FileWriter(setAppAttributesTmpFile));
+        writer.write(script);
+        writer.close();
+
+        getLog().debug("Generated temp file: " + setAppAttributesTmpFile.getName() + ". Printing out content:\n" + script);
+
+        return setAppAttributesTmpFile;
     }
 
-    public File createScriptsToRunTmpFile() throws IOException {
-        File scriptsToRunTmpFile;
-        File setApexEnvTmpFile = createSetApexEnvTmpFile();
-        File[] appExportFiles = getAppExportFiles();
+    /**
+     * Collect the APEX export files to be imported. Only .sql files are
+     * included.
+     *
+     * @return a list of file objects.
+     * @throws MojoExecutionException in case the specified appExportLocation
+     * folder is invalid.
+     * @throws MojoFailureException if read permissions on the appExportLocation
+     * folder or export files are not granted or in case no .sql files were
+     * found.
+     */
+    public File[] getAppExportFiles() throws MojoExecutionException, MojoFailureException {
+        File exportFolder = new File(appExportLocation);
+        File[] exportFiles;
 
-        scriptsToRunTmpFile = File.createTempFile("scriptsToRun", sqlFileExtension);
-        scriptsToRunTmpFile.deleteOnExit();
-
-        BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(scriptsToRunTmpFile));
-        bufferedWriter.write("@" + setApexEnvTmpFile.getAbsolutePath());
-        bufferedWriter.newLine();
-        for (File appExportFile : appExportFiles) {
-            bufferedWriter.write("@" + appExportFile.getAbsolutePath());
-            bufferedWriter.newLine();
+        if (!exportFolder.exists()) {
+            throw new MojoExecutionException("Unable to find the appExportLocation folder: " + exportFolder.getAbsolutePath());
+        } else if (!exportFolder.isDirectory()) {
+            throw new MojoExecutionException("The specified appExportLocation is not a folder: " + exportFolder.getAbsolutePath());
+        } else if (!exportFolder.canRead()) {
+            throw new MojoFailureException("No read permission on the appExportLocation folder: " + exportFolder.getAbsolutePath());
         }
-        bufferedWriter.write("exit;");
-        bufferedWriter.close();
 
-        return scriptsToRunTmpFile;
-    }
+        getLog().debug("Path to the appExportLocation folder: " + exportFolder.getAbsolutePath());
 
-    public File[] getAppExportFiles() {
-        // TODO: validate whether folder exists and is not empty.
-        File file = new File(appExportLocation);
-        File[] fileList = file.listFiles(new FileFilter() {
+        exportFiles = exportFolder.listFiles(new FileFilter() {
             @Override
             public boolean accept(File file) {
                 if (file.getName().toLowerCase().endsWith(sqlFileExtension)) {
+                    getLog().debug("Included export file: " + file.getName());
                     return true;
                 }
                 return false;
             }
         });
 
-        return fileList;
+        if (exportFiles.length == 0) {
+            throw new MojoFailureException("No .sql scripts found in the appExportLocation folder: " + exportFolder.getAbsolutePath());
+        }
+
+        for (File exportFile : exportFiles) {
+            if (!exportFile.canRead()) {
+                throw new MojoFailureException("No read permission on export file: " + exportFile.getName());
+            }
+        }
+
+        return exportFiles;
     }
 }

@@ -5,9 +5,18 @@
     <groupId>com.contribute</groupId>
     <artifactId>orclapex-maven-plugin</artifactId>
     <packaging>maven-plugin</packaging>
-    <version>1.0-SNAPSHOT</version>
+    <version>1.0</version>
     <name>orclapex-maven-plugin</name>
-    <url>http://maven.apache.org</url>
+    <url>https://github.com/nbuytaert1/orclapex-maven-plugin</url>
+
+    <developers>
+        <developer>
+            <id>buytani</id>
+            <name>Nick Buytaert</name>
+            <email>nbuytaert1@gmail.com</email>
+            <url>http://apexplained.wordpress.com/</url>
+        </developer>
+    </developers>
 
     <dependencies>
         <dependency>
