@@ -144,12 +144,12 @@ public class ImportAppMojo extends AbstractMojo {
             throw new MojoExecutionException("An unexpected error occurred while generating the .sql scripts", ex);
         }
 
-        // the -L option specifies not to reprompt for username or password if the initial connection does not succeed.
-        processBuilder = new ProcessBuilder(sqlplusCmd, "-L", getSqlPlusLoginArgument(), "@" + scriptsToRunTmpFile.getAbsolutePath());
+        // the -L option specifies not to reprompt for username or password if the initial connection didn't succeed.
+        processBuilder = new ProcessBuilder(sqlplusCmd, "-L", getSqlPlusLoginArgument(), getFriendlyPath(scriptsToRunTmpFile.getAbsolutePath()));
         setEnvironmentVariables(processBuilder.environment());
         processBuilder.redirectErrorStream(true);
 
-        getLog().debug("Executing SQL*Plus: " + sqlplusCmd + " -L " + getSqlPlusLoginArgument() + " @" + scriptsToRunTmpFile.getAbsolutePath());
+        getLog().debug("Executing SQL*Plus: " + sqlplusCmd + " -L " + getSqlPlusLoginArgument() + " " + getFriendlyPath(scriptsToRunTmpFile.getAbsolutePath()));
         try {
             process = processBuilder.start();
 
@@ -172,6 +172,26 @@ public class ImportAppMojo extends AbstractMojo {
         if (process.exitValue() != 0) {
             throw new MojoExecutionException("SQL*Plus process returned an error code (" + process.exitValue() + ")");
         }
+    }
+
+    /**
+     * Transform a path to a SQL*Plus friendly path.
+     *
+     * @param path the full path to a file.
+     * @return a SQL*Plus friendly path.
+     */
+    public String getFriendlyPath(String path) {
+        String friendlyPath;
+
+        friendlyPath = path.replace("Program Files", "Progra~1");
+        //friendlyPath = "@\"" + friendlyPath + "\""; issue #1
+        friendlyPath = "@" + friendlyPath;
+
+        if (friendlyPath.contains(" ")) {
+            getLog().debug("Path contains space character(s): " + friendlyPath);
+        }
+
+        return friendlyPath;
     }
 
     /**
@@ -224,10 +244,10 @@ public class ImportAppMojo extends AbstractMojo {
 
         script = "whenever sqlerror exit 1\n";
         script = script + "set serveroutput on\n";
-        script = script + "@" + setAppAttributesTmpFile.getAbsolutePath() + "\n";
+        script = script + getFriendlyPath(setAppAttributesTmpFile.getAbsolutePath()) + "\n";
         script = script + "set serveroutput off\n";
         for (File exportFile : exportFiles) {
-            script = script + "@" + exportFile.getAbsolutePath() + "\n";
+            script = script + getFriendlyPath(exportFile.getAbsolutePath()) + "\n";
         }
         script = script + "exit";
 
@@ -353,7 +373,7 @@ public class ImportAppMojo extends AbstractMojo {
             throw new MojoFailureException("No read permission on the appExportLocation folder: " + exportFolder.getAbsolutePath());
         }
 
-        getLog().debug("Path to the appExportLocation folder: " + exportFolder.getAbsolutePath());
+        getLog().debug("Absolute path to the appExportLocation folder: " + exportFolder.getAbsolutePath());
 
         exportFiles = exportFolder.listFiles(new FileFilter() {
             @Override
