@@ -7,6 +7,8 @@ import java.io.FileFilter;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
@@ -133,23 +135,34 @@ public class ImportAppMojo extends AbstractMojo {
      * The method called by Maven when the 'import' goal gets executed.
      */
     public void execute() throws MojoExecutionException, MojoFailureException {
-        File scriptsToRunTmpFile;
         ProcessBuilder processBuilder;
         Process process;
+        List<String> commandLineArguments = new ArrayList<String>();
+        File scriptsToRunTmpFile;
+        String workingDirectory;
         String sqlPlusOutput;
 
         try {
             scriptsToRunTmpFile = createScriptsToRunTmpFile();
+            workingDirectory = scriptsToRunTmpFile.getAbsolutePath();
         } catch (IOException ex) {
             throw new MojoExecutionException("An unexpected error occurred while generating the .sql scripts", ex);
         }
 
+        commandLineArguments.add(sqlplusCmd);
         // the -L option specifies not to reprompt for username or password if the initial connection didn't succeed.
-        processBuilder = new ProcessBuilder(sqlplusCmd, "-L", getSqlPlusLoginArgument(), getFriendlyPath(scriptsToRunTmpFile.getAbsolutePath()));
+        commandLineArguments.add("-L");
+        commandLineArguments.add(getSqlPlusLoginArgument());
+        commandLineArguments.add(getFriendlyPath(scriptsToRunTmpFile.getName()));
+
+        processBuilder = new ProcessBuilder(commandLineArguments);
         setEnvironmentVariables(processBuilder.environment());
+        // get the absolute path from the temporary file to set the working directory
+        processBuilder.directory(new File(workingDirectory.substring(0, workingDirectory.lastIndexOf(File.separator))));
+        getLog().debug("Working directory set: " + processBuilder.directory());
         processBuilder.redirectErrorStream(true);
 
-        getLog().debug("Executing SQL*Plus: " + sqlplusCmd + " -L " + getSqlPlusLoginArgument() + " " + getFriendlyPath(scriptsToRunTmpFile.getAbsolutePath()));
+        getLog().debug("Executing SQL*Plus: " + sqlplusCmd + " -L " + getSqlPlusLoginArgument() + " " + getFriendlyPath(scriptsToRunTmpFile.getName()));
         try {
             process = processBuilder.start();
 
@@ -184,7 +197,6 @@ public class ImportAppMojo extends AbstractMojo {
         String friendlyPath;
 
         friendlyPath = path.replace("Program Files", "Progra~1");
-        //friendlyPath = "@\"" + friendlyPath + "\""; issue #1
         friendlyPath = "@" + friendlyPath;
 
         if (friendlyPath.contains(" ")) {
