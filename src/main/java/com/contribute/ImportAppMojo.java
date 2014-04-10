@@ -13,121 +13,108 @@ import java.util.Map;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
+import org.apache.maven.plugins.annotations.LifecyclePhase;
+import org.apache.maven.plugins.annotations.Mojo;
+import org.apache.maven.plugins.annotations.Parameter;
 
 /**
  * Import an APEX application and any related workspace files.
- *
- * @goal import
- * @phase compile
  */
+@Mojo(name = "import",
+defaultPhase = LifecyclePhase.COMPILE)
 public class ImportAppMojo extends AbstractMojo {
 
     /**
      * The database connection string used in the SQL*Plus login argument (e.g.
      * localhost:1521/orcl.company.com).
-     *
-     * @parameter expression="${import.connectionString}"
-     * @required
      */
+    @Parameter(property = "import.connectionString",
+    required = true)
     private String connectionString;
     /**
      * The database username used to login in SQL*Plus.
-     *
-     * @parameter expression="${import.username}"
-     * @required
      */
+    @Parameter(property = "import.username",
+    required = true)
     private String username;
     /**
      * The database user's password.
-     *
-     * @parameter expression="${import.password}"
-     * @required
      */
+    @Parameter(property = "import.password",
+    required = true)
     private String password;
     /**
      * The command to start the SQL*Plus executable. The default value is
      * 'sqlplus'.
-     *
-     * @parameter expression="${import.sqlplusCmd}" default-value="sqlplus"
      */
+    @Parameter(property = "import.sqlplusCmd",
+    defaultValue = "sqlplus")
     private String sqlplusCmd;
     /**
      * Allows you to set the ORACLE_HOME system environment variable.
-     *
-     * @parameter expression="${import.oracleHome}"
      */
+    @Parameter(property = "import.oracleHome")
     private String oracleHome;
     /**
      * The TNS_ADMIN environment variable to specify the location of the
      * tnsnames.ora file.
-     *
-     * @parameter expression="${import.tnsAdmin}"
      */
+    @Parameter(property = "import.tnsAdmin")
     private String tnsAdmin;
     /**
      * Environment variable to specify the path used to search for libraries on
      * UNIX and Linux systems.
-     *
-     * @parameter expression="${import.libraryPath}"
      */
+    @Parameter(property = "import.libraryPath")
     private String libraryPath;
     /**
      * The relative path to the folder containing the application export
      * file(s).
-     *
-     * @parameter expression="${import.appExportLocation}"
-     * @required
      */
+    @Parameter(property = "import.appExportLocation",
+    required = true)
     private String appExportLocation;
     /**
      * The APEX workspace in which you want to import the application. Omit this
      * parameter to import the application in the original workspace.
-     *
-     * @parameter expression="${import.workspaceName}"
      */
+    @Parameter(property = "import.workspaceName")
     private String workspaceName;
     /**
      * The ID for the application to be imported. Omit this parameter to import
      * the application with its original ID.
-     *
-     * @parameter expression="${import.appId}"
      */
+    @Parameter(property = "import.appId")
     private String appId;
     /**
      * Set the application alias.
-     *
-     * @parameter expression="${import.appAlias}"
      */
+    @Parameter(property = "import.appAlias")
     private String appAlias;
     /**
      * Set the application name.
-     *
-     * @parameter expression="${import.appName}"
      */
+    @Parameter(property = "import.appName")
     private String appName;
     /**
      * Set the application parsing schema.
-     *
-     * @parameter expression="${import.appParsingSchema}"
      */
+    @Parameter(property = "import.appParsingSchema")
     private String appParsingSchema;
     /**
      * Set the application image prefix.
-     *
-     * @parameter expression="${import.appImagePrefix}"
      */
+    @Parameter(property = "import.appImagePrefix")
     private String appImagePrefix;
     /**
      * Set the proxy server attributes for the application to be imported.
-     *
-     * @parameter expression="${import.appProxy}"
      */
+    @Parameter(property = "import.appProxy")
     private String appProxy;
     /**
      * The offset value for the application import.
-     *
-     * @parameter expression="${import.appOffset}"
      */
+    @Parameter(property = "import.appOffset")
     private String appOffset;
     private final String sqlFileExtension = ".sql";
 
