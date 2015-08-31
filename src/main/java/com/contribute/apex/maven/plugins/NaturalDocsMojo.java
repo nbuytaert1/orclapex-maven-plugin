@@ -116,7 +116,7 @@ public class NaturalDocsMojo extends AbstractMojo {
         validateParameters();
 
         if (System.getProperty("os.name").toLowerCase().startsWith("win")) {
-            NaturalDocsExecutable += ".bat";
+            perlExecutable += ".exe";
         }
 
         commandLineArguments.add(perlExecutable);
