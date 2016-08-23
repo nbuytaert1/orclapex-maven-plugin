@@ -22,7 +22,7 @@ The following tasks are currently being worked on:
 - Download the latest release of the Oracle APEX Maven plugin.
 - Unzip the downloaded archive file.
 - Open a terminal window and change the directory to the unzipped orclapex-maven-plugin folder.
-- Install the JAR file in your Maven repository: <code>mvn install:install-file -Dfile=orclapex-maven-plugin-1.0.1.jar -DpomFile=orclapex-maven-plugin-1.0.1-pom.xml</code>
+- Install the JAR file in your Maven repository: <code>mvn install:install-file -Dfile=orclapex-maven-plugin-1.0.2.jar -DpomFile=orclapex-maven-plugin-1.0.2-pom.xml</code>
 
 ##Blog posts
 

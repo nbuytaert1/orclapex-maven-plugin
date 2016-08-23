@@ -112,6 +112,11 @@ public class ImportAppMojo extends AbstractMojo {
     @Parameter(property = "import.appProxy")
     private String appProxy;
     /**
+     * Automatically install or upgrade the application's supporting objects.
+     */
+    @Parameter(property = "import.autoInstallSupObj")
+    private String autoInstallSupObj;
+    /**
      * The offset value for the application import.
      */
     @Parameter(property = "import.appOffset")
@@ -322,7 +327,12 @@ public class ImportAppMojo extends AbstractMojo {
         if (appProxy != null) {
             script = script + ""
                     + "  apex_application_install.set_proxy('" + appProxy + "');\n"
-                    + "  dbms_output.put_line('application proxy attributes set: " + appProxy + "');\n";
+                    + "  dbms_output.put_line('application proxy attribute set: " + appProxy + "');\n";
+        }
+        if (autoInstallSupObj != null) {
+            script = script + ""
+                    + "  apex_application_install.set_auto_install_sup_obj(" + autoInstallSupObj + ");\n"
+                    + "  dbms_output.put_line('application auto install supporting objects attribute set: " + autoInstallSupObj + "');\n";
         }
         if (appOffset != null) {
             script = script + ""
