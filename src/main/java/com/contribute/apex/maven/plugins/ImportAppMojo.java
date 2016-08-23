@@ -164,13 +164,16 @@ public class ImportAppMojo extends AbstractMojo {
                 getLog().info(sqlPlusOutput);
             }
             stdError.close();
+            process.waitFor();
+
+            getLog().debug("SQL*Plus process exit value: " + process.exitValue());
+            if (process.exitValue() != 0) {
+                throw new MojoExecutionException("SQL*Plus process returned an error code (" + process.exitValue() + ")");
+            }
         } catch (IOException ex) {
             throw new MojoExecutionException("An unexpected error occurred while executing SQL*Plus", ex);
-        }
-
-        getLog().debug("SQL*Plus process exit value: " + process.exitValue());
-        if (process.exitValue() != 0) {
-            throw new MojoExecutionException("SQL*Plus process returned an error code (" + process.exitValue() + ")");
+        } catch (InterruptedException ex) {
+            throw new MojoExecutionException("An unexpected error occurred while executing SQL*Plus", ex);
         }
     }
 
