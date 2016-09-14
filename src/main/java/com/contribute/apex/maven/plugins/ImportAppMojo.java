@@ -229,6 +229,7 @@ public class ImportAppMojo extends AbstractMojo {
             environment.put("LIBPATH", libraryPath);
             environment.put("SHLIB_PATH", libraryPath);
         }
+        environment.put("NLS_LANG", "AMERICAN_AMERICA.UTF8");
 
         getLog().debug("Printing all environment variables:");
         for (Object key : environment.keySet()) {
